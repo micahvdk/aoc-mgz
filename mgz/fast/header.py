@@ -254,37 +254,46 @@ def parse_map(data, version, save):
 
 
 def parse_scenario(data, num_players, version, save):
-    """Parse scenario section."""
-    scenario_version = unpack('<f', data)
-    data.read(4)
-    if save >= 61.5:
-        data.read(4)
-        if save < 66.6:
-            data.read(4)
-    data.read(16 * 256)
-    data.read(16 * 4)
+    """Parse scenario section.
+
+    Header layout changed substantially in save version 66.6 (Caspian Sea DLC,
+    late 2025). The pre-66.6 layout is the historical one that has worked
+    since the early DE/HD/UserPatch days. Keeping both paths preserves
+    compatibility with the full fixture set in tests/recs/ instead of only
+    the newest saves.
+    """
+    scenario_filename = None
     if save >= 66.6:
+        # ── New layout (save >= 66.6) ───────────────────────────────────────
+        scenario_version = unpack('<f', data)
+        data.read(4)
+        data.read(4)  # save >= 61.5 (always true here)
+        data.read(16 * 256)
+        data.read(16 * 4)
         for i in range(0, 16):
             data.read(8)
             de_string(data)
             de_string(data)
             data.read(4)
-    if save >= 61.5 and save < 66.6:
-        data.read(64)
-    if save < 66.6:
-        for i in range(0, 16):
-            data.read(12)
-            if save >= 13.34:
-                data.read(4)
-            data.read(4)
-    data.read(5)
-    elapsed_time = unpack('<f', data)
-    scenario_filename = aoc_string(data)
-    if version is Version.DE:
-        data.read(64)
-    if save >= 66.6:
+        data.read(5)
+        elapsed_time = unpack('<f', data)
+        scenario_filename = aoc_string(data)
+        if version is Version.DE:
+            data.read(64)
         data.read(68)
-    data.read(20)
+        data.read(20)
+    else:
+        # ── Legacy layout (save < 66.6) ─────────────────────────────────────
+        next_uid, scenario_version = unpack('<II', data)
+        if save >= 61.5:
+            data.read(72)
+        data.read(4447)
+        if version is Version.DE:
+            data.read(102)
+            scenario_filename = aoc_string(data)
+            data.read(24)
+
+    # ── Common tail (identical for both layouts) ─────────────────────────────
     instructions = aoc_string(data)
     for _ in range(0, 9):
         aoc_string(data)
