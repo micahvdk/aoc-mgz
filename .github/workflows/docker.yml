@@ -15,8 +15,9 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  GHCR_REGISTRY: ghcr.io
+  GHCR_IMAGE: ${{ github.repository }}
+  DOCKERHUB_IMAGE: aoc-mgz
 
 jobs:
   build:
@@ -38,20 +39,24 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ${{ env.GHCR_REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request' && vars.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          # tag rules:
-          #   - branch name (e.g. chieftains-save-67)
-          #   - `latest` only on master
-          #   - semver on git tags (v1.2.3 -> 1.2.3, 1.2, 1)
-          #   - short sha for traceability
+          images: |
+            ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_IMAGE }}
+            ${{ vars.DOCKERHUB_USERNAME && format('{0}/{1}', vars.DOCKERHUB_USERNAME, env.DOCKERHUB_IMAGE) || '' }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
